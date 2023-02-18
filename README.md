@@ -18,7 +18,7 @@ ___
 **Installing** (first of all install [foundry](https://book.getfoundry.sh/))
 
 ```bash
-git clone https://github.com/FennecTechnology/FennecSwap && cd FennecSwap
+git clone https://github.com/FennecTechnology/FennecSwap.git && cd FennecSwap
 ```
 
 ```bash
