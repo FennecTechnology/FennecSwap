@@ -7,16 +7,28 @@
 ## Manual for build and tests
 ___
 
-**Installing** (first of all install [foundry](https://book.getfoundry.sh/))
+First of all install [foundry](https://book.getfoundry.sh/)
 
+**Clone this repository**
 ```bash
-git clone https://github.com/FennecTechnology/FennecSwap.git && cd FennecSwap
+git clone https://github.com/FennecTechnology/FennecSwap.git
+```
+```bash
+cd FennecSwap
 ```
 
+**Installing libraries**
 ```bash
-forge install smartcontractkit/chainlink, OpenZeppelin/openzeppelin-contracts, foundry-rs/forge-std
+forge install smartcontractkit/chainlink --no-git
+```
+```bash
+forge install OpenZeppelin/openzeppelin-contracts --no-git
+```
+```bash
+forge install foundry-rs/forge-std --no-git
 ```
 
+**Build the project's smart contracts**
 ```bash
 forge build
 ```
