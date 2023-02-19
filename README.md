@@ -1,17 +1,9 @@
 <br/>
 <p align="center">
-<a href="" target="_blank">
-<img src="logo.svg" width="200">
-</a>
+<img src="About.svg" width="800">
 </p>
 <br/>
 
-## About
-___
-* `FennecSwap contract for P2P exchange between users.`
-* `The basic principle of trust is based on the freezing of deposits of both participants in the transaction.`
-* `This project uses chainlink price feed contracts to determine the price of ETH, BNB and MATIC.`
-* `The possibility of stacking the token Fennec to make a profit from the contract FennecSwap.`
 ## Manual for build and tests
 ___
 

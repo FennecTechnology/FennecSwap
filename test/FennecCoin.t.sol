@@ -4,7 +4,7 @@
 pragma solidity ^0.8.10;
 
 import "forge-std/Test.sol";
-import { FennecCoin } from "../src/token/FennecCoin.sol";
+import { FennecCoin } from "./helpers/FennecCoin.sol";
 import { PriceFeed } from "./helpers/PriceFeed.sol";
 import "./helpers/Addresses.sol";
 

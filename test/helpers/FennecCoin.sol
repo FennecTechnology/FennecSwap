@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.17;
 
-import "./ICO/FennecICO.sol";
+import "./FennecICO.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 uint256 constant TOTALSUPPLY = 1000000;
