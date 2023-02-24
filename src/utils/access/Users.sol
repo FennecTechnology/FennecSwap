@@ -30,14 +30,14 @@ abstract contract Users {
         require(bytes(_userInfo[msg.sender].telegram).length == 0, "You are user");        
         require(!_reservedName[_username], "Username is not available");
 
-        bytes32 message = withPrefix(keccak256(abi.encodePacked(
+        bytes32 message = _withPrefix(keccak256(abi.encodePacked(
             msg.sender,
             _username,
             _telegram
         )));
 
         require(
-            recoverSigner(message, signature) == admin, "invalid sig!"
+            _recoverSigner(message, signature) == admin, "invalid sig!"
         );
 
         _userInfo[msg.sender].username = _username;
@@ -47,13 +47,13 @@ abstract contract Users {
 
     /// @dev service functions:
 
-    function recoverSigner(bytes32 message, bytes calldata signature) private pure returns(address) {
-        (uint8 v, bytes32 r, bytes32 s) = splitSignature(signature);
+    function _recoverSigner(bytes32 message, bytes calldata signature) private pure returns(address) {
+        (uint8 v, bytes32 r, bytes32 s) = _splitSignature(signature);
 
         return ecrecover(message, v, r, s);
     }
 
-    function splitSignature(bytes memory signature) private pure returns(uint8 v, bytes32 r, bytes32 s) {
+    function _splitSignature(bytes memory signature) private pure returns(uint8 v, bytes32 r, bytes32 s) {
         require(signature.length == 65);
 
         assembly {
@@ -67,7 +67,7 @@ abstract contract Users {
         return(v, r, s);
     }
 
-    function withPrefix(bytes32 hash) private pure returns(bytes32) {
+    function _withPrefix(bytes32 hash) private pure returns(bytes32) {
         return keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n32",

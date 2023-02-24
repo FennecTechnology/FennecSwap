@@ -19,16 +19,13 @@ abstract contract Ownable {
         _;
     }
 
-    function _changeOwner(string calldata _password, bytes32 _newPassword) internal {
-        require(_checkPassword(_password, _newPassword));
-
+    function _changeOwner(bytes32 _newPassword) internal {
         ownerPassword = _newPassword;
         owner = payable(msg.sender);
     }
 
-    function _checkPassword(string calldata _password, bytes32 _newPassword) internal view returns(bool) {
-        require(ownerPassword == keccak256(abi.encodePacked(_password)), "Incorrect passwaord");
-        require(ownerPassword != _newPassword, "New and current passwords match!");
+    function _checkPassword(bytes32 password, string calldata _key) internal pure returns(bool) {
+        require(password == keccak256(abi.encodePacked(_key)), "Incorrect password");
         return true;
     }
 }

@@ -6,6 +6,7 @@ pragma solidity ^0.8.17;
 import "./utils/access/Ownable.sol";
 import "./utils/access/Users.sol";
 import "./utils/finance/MinDeposit.sol";
+import "./utils/security/OnlyEOA.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -15,7 +16,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
     /// @dev The basic principle of trust is based on freezing the deposits of both parties to the transaction.
     /// @dev Contract uses "chainlink" price feed contracts to determine the price of ETH, BNB and MATIC.
 
-contract FennecSwap is Ownable, Users, MinDeposit {
+contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     using SafeERC20 for IERC20;
 
     /// @return 'Variables in storage'
@@ -23,6 +24,10 @@ contract FennecSwap is Ownable, Users, MinDeposit {
     uint256 public totalOrders;
     mapping(string => IERC20) private _addressToken;
     mapping(uint256 => Order) private _orders;
+
+    /// @dev custom errors
+    error UnavailableOrder();
+    error IncorrectPass();
 
     /// @dev setting all required variables.
     constructor (address payable _fennecCoin, bytes32 _ownerPassword, address _priceFeed, address _admin)
@@ -37,7 +42,7 @@ contract FennecSwap is Ownable, Users, MinDeposit {
     /// @dev The list of stablecoins is limited and only the owner of can add them.
     event newToken(string symbol, address token);
 
-    function addToken(IERC20 _token) external onlyOwner {
+    function addToken(IERC20 _token) external onlyOwner onlyEOA {
         string memory symbol = IERC20Metadata(address(_token)).symbol();
         require(_addressToken[symbol] == IERC20(address(0)), "Token has already been added");
         _addressToken[symbol] = _token;
@@ -45,19 +50,25 @@ contract FennecSwap is Ownable, Users, MinDeposit {
     }
 
     /// @dev The owner can set a minimum deposit in USD.
-    function setMinDeposit(uint _amount) external onlyOwner {
+    function setMinDeposit(uint _amount) external onlyOwner onlyEOA {
         _setMinDeposit(_amount);
     }
 
     /// @dev To change the owner of the contract, you must enter an unencrypted password.
-    function changeOwner(string calldata _password, bytes32 _newPassword) external {
-        _changeOwner(_password, _newPassword);
+    function changeOwner(string calldata _key, bytes32 _newPassword) external onlyEOA {
+        require(_checkPassword(ownerPassword, _key));
+        require(ownerPassword != _newPassword, "New and current passwords match!");
+        
+        _changeOwner(_newPassword);
     }
 
     /// @dev To change the admin, you must enter an unencrypted password.
-    function changeAdmin(string calldata _password, bytes32 _newPassword, address _newAdmin) external {
-        _checkPassword(_password, _newPassword);
+    function changeAdmin(string calldata _key, bytes32 _newPassword, address _newAdmin) external onlyEOA {
+        require(_checkPassword(ownerPassword, _key));
+        require(ownerPassword != _newPassword, "New and current passwords match!");
+        
         admin = _newAdmin;
+        ownerPassword = _newPassword;
     }
 
     /// Public functions:
@@ -68,7 +79,7 @@ contract FennecSwap is Ownable, Users, MinDeposit {
     }
 
     /// @dev Simple user registration
-    function registration(string calldata _username, string calldata _telegram, bytes calldata signature) external {
+    function registration(string calldata _username, string calldata _telegram, bytes calldata signature) external onlyEOA {
         _registration(_username, _telegram, signature);
     }
 
@@ -98,7 +109,7 @@ contract FennecSwap is Ownable, Users, MinDeposit {
 
     /// @dev Event when a new order was placed
     event orderPlaced(
-        uint256 number,         
+        uint256 id,         
         address indexed creator
     );
 
@@ -172,30 +183,35 @@ contract FennecSwap is Ownable, Users, MinDeposit {
             );
         }
 
-    event orderStatus(uint256 _number, string indexed completed);
+    event orderStatus(uint256 id, string indexed status);
 
     /// @dev Function for order approval.
         /// * to approve the order, an unencrypted password created by the author is required.
-    function approve(uint256 _number, string calldata _password) external payable onlyUsers {
-        require(_orders[_number].password != bytes32(0), "Order does not exist");
-        Order storage newOrder = _orders[_number];
-        require(newOrder.password != bytes32(0), "Order has been completed or canceled");
-        require(newOrder.password == keccak256(abi.encodePacked(_password)), "Incorrect password");
-        require(msg.value == newOrder.deposit, "Incorrect deposit");
-        IERC20 token = _addressToken[newOrder.token];
+    function approve(uint256 _id, string calldata _key) external payable onlyUsers {
+        Order storage newOrder = _orders[_id];
 
-        if (newOrder.seller == address(0)) {
+        if (_checkOrder(newOrder) == true) {
+            revert UnavailableOrder();
+        }
+
+        if (_checkPassword(newOrder.password, _key) == false) {
+            revert IncorrectPass();
+        }
+
+        require(newOrder.deposit == msg.value, "Incorrect deposit");
+
+        if (newOrder.seller == address(0) && newOrder.buyer != address(0)) {            
+            IERC20 token = _addressToken[newOrder.token];
             require(newOrder.buyer != msg.sender, "It is your order!");
             SafeERC20.safeTransferFrom(token, msg.sender, address(this), newOrder.amount);
             newOrder.seller = payable(msg.sender);
-            emit orderStatus(_number, "Approved");
+            emit orderStatus(_id, "Approved");
         }   
-        else if (newOrder.buyer == address(0)) {
+        else if (newOrder.buyer == address(0) && newOrder.seller != address(0)) {
             require(newOrder.seller != msg.sender, "It is your order!");
             newOrder.buyer = payable(msg.sender);
-            emit orderStatus(_number, "Approved");
-        }
-        else {
+            emit orderStatus(_id, "Approved");
+        } else {
             revert ("Order has been approved!");
         }       
     }
@@ -205,11 +221,15 @@ contract FennecSwap is Ownable, Users, MinDeposit {
         /// * transaction fee 0.5 percent of the deposit amount.
         /// * one part of the commission is transferred to the owner contract,
         /// * second part is transferred to the "FennecCoin" contract for redistribution among stakeholders.        
-    function exchange(uint256 _number) external {
-        require(_orders[_number].password != bytes32(0), "Order does not exist");
-        Order storage newOrder = _orders[_number];
-        require(payable(msg.sender) == newOrder.seller, "You are not a seller!");        
-        require(newOrder.password != bytes32(0), "Order has been completed or canceled");
+    function exchange(uint256 _id) external {
+        Order storage newOrder = _orders[_id];
+
+        if (_checkOrder(newOrder) == true) {
+            revert UnavailableOrder();
+        }
+
+        require(payable(msg.sender) == newOrder.seller, "You are not a seller!");
+
         IERC20 token = _addressToken[newOrder.token];
         
         delete newOrder.password;
@@ -224,35 +244,48 @@ contract FennecSwap is Ownable, Users, MinDeposit {
             ++_userInfo[newOrder.buyer].completedOrders;
         }
 
-        emit orderStatus(_number, "Exchanged");
+        emit orderStatus(_id, "Exchanged");
     }
 
     /// @dev Function to cancel the order.
         /// * only the author can cancel the order.
         /// * transaction fee 0.5 percent of the deposit amount.
-    function cancel(uint256 _number) external {
-        require(_orders[_number].password != bytes32(0), "Order does not exist");
-        Order storage newOrder = _orders[_number];
+    function cancel(uint256 _id) external {
+        Order storage newOrder = _orders[_id];
+        
+        if (_checkOrder(newOrder) == true) {
+            revert UnavailableOrder();
+        }
+        
         require(newOrder.seller == msg.sender || newOrder.buyer == msg.sender, "It's not your order!");
-        require(newOrder.password != bytes32(0), "Order has been canceled or completed");
-        IERC20 token = _addressToken[newOrder.token];
 
         if (newOrder.seller == address(0)) {
             delete newOrder.password;
             newOrder.buyer.transfer(newOrder.deposit * 199 / 200);
             owner.transfer(newOrder.deposit / 200);
-            emit orderStatus(_number, "Canceled");
+            emit orderStatus(_id, "Canceled");
         }    
         else if (newOrder.buyer == address(0)) {
+            IERC20 token = _addressToken[newOrder.token];
             delete newOrder.password;
             SafeERC20.safeTransfer(token, newOrder.seller, newOrder.amount);
             newOrder.seller.transfer(newOrder.deposit * 199 / 200);
             owner.transfer(newOrder.deposit / 200);
-            emit orderStatus(_number, "Canceled");
+            emit orderStatus(_id, "Canceled");
         }
         else {
             revert ("Order has been approved!");
         }
+    }
+
+    /// Service functions
+    
+    /// @dev Сhecking orders and passwords
+    function _checkOrder(Order memory _newOrder) private pure returns(bool) {
+        return 
+            _newOrder.buyer == address(0) && 
+            _newOrder.seller == address(0) &&
+            _newOrder.password == bytes32(0);
     }
 
 }
