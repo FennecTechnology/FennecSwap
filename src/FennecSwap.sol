@@ -25,10 +25,6 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     mapping(string => IERC20) private _addressToken;
     mapping(uint256 => Order) private _orders;
 
-    /// @dev custom errors
-    error UnavailableOrder();
-    error IncorrectPass();
-
     /// @dev setting all required variables.
     constructor (address payable _fennecCoin, bytes32 _ownerPassword, address _priceFeed, address _admin)
         Ownable (_ownerPassword)
@@ -190,15 +186,9 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     function approve(uint256 _id, string calldata _key) external payable onlyUsers {
         Order storage newOrder = _orders[_id];
 
-        if (_checkOrder(newOrder) == true) {
-            revert UnavailableOrder();
-        }
-
-        if (_checkPassword(newOrder.password, _key) == false) {
-            revert IncorrectPass();
-        }
-
-        require(newOrder.deposit == msg.value, "Incorrect deposit");
+        require(_checkOrder(newOrder), "Unavailable order!");
+        require(_checkPassword(newOrder.password, _key), "Incorrect password!");
+        require(newOrder.deposit == msg.value, "Incorrect deposit!");
 
         if (newOrder.seller == address(0) && newOrder.buyer != address(0)) {            
             IERC20 token = _addressToken[newOrder.token];
@@ -224,10 +214,7 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     function exchange(uint256 _id) external {
         Order storage newOrder = _orders[_id];
 
-        if (_checkOrder(newOrder) == true) {
-            revert UnavailableOrder();
-        }
-
+        require(_checkOrder(newOrder), "Unavailable order!");
         require(payable(msg.sender) == newOrder.seller, "You are not a seller!");
 
         IERC20 token = _addressToken[newOrder.token];
@@ -253,10 +240,7 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     function cancel(uint256 _id) external {
         Order storage newOrder = _orders[_id];
         
-        if (_checkOrder(newOrder) == true) {
-            revert UnavailableOrder();
-        }
-        
+        require(_checkOrder(newOrder), "Unavailable order!");        
         require(newOrder.seller == msg.sender || newOrder.buyer == msg.sender, "It's not your order!");
 
         if (newOrder.seller == address(0)) {
@@ -280,12 +264,14 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
 
     /// Service functions
     
-    /// @dev Сhecking orders and passwords
+    /// @dev Сhecking orders and password
     function _checkOrder(Order memory _newOrder) private pure returns(bool) {
-        return 
-            _newOrder.buyer == address(0) && 
-            _newOrder.seller == address(0) &&
-            _newOrder.password == bytes32(0);
+        if (_newOrder.buyer == address(0) && _newOrder.seller == address(0)) {
+            return false;
+        } else if (_newOrder.password == bytes32(0)) {
+            return false;
+        } else {
+            return true;
+        }
     }
-
 }

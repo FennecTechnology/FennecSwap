@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// FennecTechnology Contracts (version v0.1) (security/protection.sol)
+// FennecTechnology Contracts (version v0.1) (security/OnlyEOA.sol)
 
 pragma solidity ^0.8.17;
 
