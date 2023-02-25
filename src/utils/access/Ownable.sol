@@ -25,7 +25,7 @@ abstract contract Ownable {
     }
 
     function _checkPassword(bytes32 password, string calldata _key) internal pure returns(bool) {
-        require(password == keccak256(abi.encodePacked(_key)), "Incorrect password");
+        require(password == keccak256(abi.encodePacked(_key)), "Incorrect key");
         return true;
     }
 }

@@ -10,8 +10,8 @@ import "./utils/security/OnlyEOA.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-/// @title FennecSwap
-    /// @author 'FennecTechnology'
+    /// @title FennecSwap
+    /// @author 'FennecTechnology' 🦊
     /// @notice Contract for P2P exchange between users.
     /// @dev The basic principle of trust is based on freezing the deposits of both parties to the transaction.
     /// @dev Contract uses "chainlink" price feed contracts to determine the price of ETH, BNB and MATIC.
@@ -27,10 +27,10 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
 
     /// @dev setting all required variables.
     constructor (address payable _fennecCoin, bytes32 _ownerPassword, address _priceFeed, address _admin)
-        Ownable (_ownerPassword)
-        MinDeposit (_priceFeed)
-        Users(_admin) {
+        Ownable(_ownerPassword)
+        MinDeposit(_priceFeed) {
         fennecCoin = _fennecCoin;
+        _addAdmin(_admin);
     }
 
     /// Owner functions:
@@ -38,7 +38,7 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     /// @dev The list of stablecoins is limited and only the owner of can add them.
     event newToken(string symbol, address token);
 
-    function addToken(IERC20 _token) external onlyOwner onlyEOA {
+    function addToken(IERC20 _token) external onlyOwner {
         string memory symbol = IERC20Metadata(address(_token)).symbol();
         require(_addressToken[symbol] == IERC20(address(0)), "Token has already been added");
         _addressToken[symbol] = _token;
@@ -46,7 +46,7 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     }
 
     /// @dev The owner can set a minimum deposit in USD.
-    function setMinDeposit(uint _amount) external onlyOwner onlyEOA {
+    function setMinDeposit(uint _amount) external onlyOwner {
         _setMinDeposit(_amount);
     }
 
@@ -58,13 +58,19 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
         _changeOwner(_newPassword);
     }
 
-    /// @dev To change the admin, you must enter an unencrypted password.
-    function changeAdmin(string calldata _key, bytes32 _newPassword, address _newAdmin) external onlyEOA {
-        require(_checkPassword(ownerPassword, _key));
-        require(ownerPassword != _newPassword, "New and current passwords match!");
-        
-        admin = _newAdmin;
-        ownerPassword = _newPassword;
+    /// @dev Add new admin.
+    function addAdmin(address _newAdmin) external onlyOwner {
+        _addAdmin(_newAdmin);
+    }
+
+    /// @dev Remove status user.
+    function removeStatus(address _user) external onlyOwner {
+        _removeStatus(_user);
+    }
+
+    /// @dev Block a user.
+    function ban(address _user) external onlyOwner {
+        _ban(_user);
     }
 
     /// Public functions:
@@ -96,9 +102,9 @@ contract FennecSwap is Ownable, Users, MinDeposit, OnlyEOA {
     }
 
     /// @dev View all orders by number.
-    function order(uint256 _number) external view returns(Order memory) {
-        require(_orders[_number].buyer != address(0) && _orders[_number].seller != address(0), "Order does not exist");
-        return _orders[_number];
+    function order(uint256 _id) external view returns(Order memory) {
+        require(_orders[_id].buyer != address(0) && _orders[_id].seller != address(0), "Order does not exist");
+        return _orders[_id];
     }
 
     /// Main user functions:
